@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(timeout 15 python:*)",
+      "Bash(echo:*)",
+      "Bash(advanced_01.json)",
+      "Bash(for file in advanced_02.json advanced_03.json expert_01.json expert_02.json expert_03.json)",
+      "Bash(do echo {})",
+      "Bash($file)",
+      "Bash(done)",
+      "Bash(dir:*)",
+      "Bash(test:*)",
+      "Bash(awk:*)",
+      "Bash(PUZZLE_SYSTEM.md)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
