@@ -4,12 +4,13 @@ import math
 import random
 import sys
 import time
+import threading
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 import pygame
 
-from game import Game, StateTuple
+from game import Game, MoveTuple, StateTuple
 from search import a_star, heuristic, is_goal, set_move_provider
 
 WINDOW_SIZE = 720
@@ -258,9 +259,22 @@ def main() -> None:
     redo_stack: List[Tuple[StateTuple, int]] = []
     SUCCESS_HOLD_DURATION = 4.0
     success_hold_timer = 0.0
+    solver_thread: Optional[threading.Thread] = None
+    solver_running = False
+    solver_result: Optional[
+        Tuple[List[MoveTuple], float, int, float, StateTuple]
+    ] = None
+    solver_error: Optional[str] = None
+    solver_spin_angle = 0.0
+    solver_request_level: Optional[str] = None
 
     def start_solver() -> None:
         nonlocal status_message, auto_play, success_animation, status_fade, particles, success_hold_timer
+        nonlocal solver_thread, solver_running, solver_result, solver_error, solver_spin_angle, solver_request_level
+        if solver_running:
+            status_message = "Solver already running..."
+            status_fade = 1.0
+            return
         if game_state != "playing":
             status_message = "Select a level to start."
             status_fade = 1.0
@@ -274,25 +288,40 @@ def main() -> None:
             status_message = "No level loaded."
             status_fade = 1.0
             return
-        start = time.perf_counter()
-        path, cost, expanded = a_star(state, game.get_valid_moves)
-        elapsed = time.perf_counter() - start
-        if path:
-            status_message = f"✓ Solution found: {cost} moves in {elapsed:.2f}s"
-            print("success")
-            game.apply_solution(path)
-            game.nodes_expanded = expanded
-            game.last_heuristic = heuristic(state)
-            auto_play = True
-            status_fade = 1.0
 
-            for _ in range(30):
-                particles.append(
-                    Particle(WINDOW_SIZE // 2, WINDOW_SIZE // 2, (100, 200, 255))
+        solver_error = None
+        solver_result = None
+        solver_spin_angle = 0.0
+        auto_play = False
+        status_message = "Solving puzzle..."
+        status_fade = 1.0
+        solver_request_level = selected_level
+
+        state_snapshot = state
+
+        def run_solver(state_snapshot: StateTuple) -> None:
+            nonlocal solver_result, solver_running, solver_error
+            try:
+                start_time = time.perf_counter()
+                path, cost, expanded = a_star(state_snapshot, game.get_valid_moves)
+                elapsed_time = time.perf_counter() - start_time
+                solver_result = (
+                    path,
+                    float(cost),
+                    expanded,
+                    elapsed_time,
+                    state_snapshot,
                 )
-        else:
-            status_message = "✗ No solution found."
-            status_fade = 1.0
+            except Exception as exc:
+                solver_error = str(exc)
+            finally:
+                solver_running = False
+
+        solver_running = True
+        solver_thread = threading.Thread(
+            target=run_solver, args=(state_snapshot,), daemon=True
+        )
+        solver_thread.start()
 
     def next_step() -> None:
         nonlocal status_message, auto_play, success_animation, status_fade, particles, success_hold_timer
@@ -558,6 +587,11 @@ def main() -> None:
             success_animation = max(0, success_animation - dt * 0.5)
         if status_fade > 0:
             status_fade = max(0, status_fade - dt * 0.5)
+        if solver_running:
+            solver_spin_angle = (solver_spin_angle + dt * 6.0) % (math.tau if hasattr(math, "tau") else 2 * math.pi)
+            status_fade = 1.0
+        else:
+            solver_spin_angle = 0.0
 
         particles = [p for p in particles if p.update(dt)]
 
@@ -569,6 +603,11 @@ def main() -> None:
                 for button in menu_buttons:
                     button.handle_event(event)
             else:
+                if solver_running:
+                    if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+                        status_message = "Solver running... please wait."
+                        status_fade = 1.0
+                    continue
                 if success_hold_timer <= 0:
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         mouse_x, mouse_y = event.pos
@@ -661,6 +700,56 @@ def main() -> None:
                     button.handle_event(event)
                 for button in undo_redo_buttons:
                     button.handle_event(event)
+
+        if not solver_running:
+            if solver_error:
+                status_message = f"Solver error: {solver_error}"
+                status_fade = 1.0
+                solver_error = None
+                solver_request_level = None
+            elif solver_result is not None:
+                path, cost, expanded, elapsed_time, initial_state = solver_result
+                solver_result = None
+                previous_level = solver_request_level
+                solver_request_level = None
+                if game_state != "playing" or previous_level != selected_level:
+                    status_message = "Solver finished, but puzzle changed."
+                    status_fade = 1.0
+                elif path:
+                    if game.current_state != initial_state:
+                        status_message = "Solver finished, but puzzle changed."
+                        status_fade = 1.0
+                    else:
+                        if math.isfinite(cost):
+                            cost_text = (
+                                str(int(cost))
+                                if float(cost).is_integer()
+                                else f"{cost:.2f}"
+                            )
+                        else:
+                            cost_text = "∞"
+                        status_message = (
+                            f"✓ Solution found: {cost_text} moves in {elapsed_time:.2f}s"
+                        )
+                        print("success")
+                        game.apply_solution(path)
+                        game.nodes_expanded = expanded
+                        game.last_heuristic = heuristic(initial_state)
+                        auto_play = True
+                        auto_play_timer = 0.0
+                        status_fade = 1.0
+
+                        for _ in range(30):
+                            particles.append(
+                                Particle(
+                                    WINDOW_SIZE // 2,
+                                    WINDOW_SIZE // 2,
+                                    (100, 200, 255),
+                                )
+                            )
+                else:
+                    status_message = "✗ No solution found."
+                    status_fade = 1.0
 
         if auto_play and game_state == "playing":
             auto_play_timer += dt
@@ -948,8 +1037,38 @@ def main() -> None:
                 200 + int(55 * status_fade),
                 200 + int(55 * status_fade),
             )
+            spinner_offset = 0
+            if solver_running:
+                spinner_size = 22
+                spinner_surf = pygame.Surface(
+                    (spinner_size, spinner_size), pygame.SRCALPHA
+                )
+                spinner_center = spinner_size / 2
+                segments = 12
+                for index in range(segments):
+                    angle = solver_spin_angle + (index / segments) * 2 * math.pi
+                    fade = (index + 1) / segments
+                    color = (100, int(160 + 60 * fade), 255, int(200 * fade))
+                    end_x = spinner_center + math.cos(angle) * (spinner_size / 2 - 2)
+                    end_y = spinner_center + math.sin(angle) * (spinner_size / 2 - 2)
+                    pygame.draw.line(
+                        spinner_surf,
+                        color,
+                        (
+                            int(round(spinner_center)),
+                            int(round(spinner_center)),
+                        ),
+                        (
+                            int(round(end_x)),
+                            int(round(end_y)),
+                        ),
+                        2,
+                    )
+                screen.blit(spinner_surf, (status_x, status_y + 4))
+                spinner_offset = spinner_size + 8
+
             status_surf = info_font.render(status_message, True, status_color)
-            screen.blit(status_surf, (status_x, status_y + 6))
+            screen.blit(status_surf, (status_x + spinner_offset, status_y + 6))
 
         for button in buttons:
             button.draw(screen, button_font)

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import ast
 from dataclasses import dataclass
+import re
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -13,6 +15,11 @@ except ImportError:
 
 StateTuple = Tuple[Tuple[str, int, int, str, int], ...]
 MoveTuple = Tuple[str, str, StateTuple]
+
+_CAR_PATTERN = re.compile(
+    r"""car\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*\)\s*$""",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -405,9 +412,12 @@ class Game:
         if not self._prolog:
             return []
         prolog_state = self._state_to_prolog(state)
-        query = f"valid_move({prolog_state}, Car, Dir, NewState)"
+        query = f"valid_move({prolog_state}, Car, Dir, Step, NewState)"
         moves: List[MoveTuple] = []
         for solution in self._prolog.query(query):
+            step = int(solution.get("Step", 1))
+            if step != 1:
+                continue
             car_id = str(solution["Car"]).upper()
             direction = str(solution["Dir"]).lower()
             new_state = self._parse_prolog_state(solution["NewState"])
@@ -417,15 +427,51 @@ class Game:
     def _parse_prolog_state(self, state_term) -> StateTuple:
 
         parsed: List[Tuple[str, int, int, str, int]] = []
-        for car in state_term:
-            identifier = str(car.args[0]).upper()
-            x = int(car.args[1])
-            y = int(car.args[2])
-            orientation = str(car.args[3]).upper()
-            length = int(car.args[4])
-            parsed.append((identifier, x, y, orientation, length))
+
+        def _parse_entry(entry) -> Tuple[str, int, int, str, int]:
+            if hasattr(entry, "args"):
+                identifier = str(entry.args[0]).upper()
+                x = int(entry.args[1])
+                y = int(entry.args[2])
+                orientation = str(entry.args[3]).upper()
+                length = int(entry.args[4])
+                return identifier, x, y, orientation, length
+            if isinstance(entry, str):
+                return self._parse_car_string(entry)
+            return self._parse_car_string(str(entry))
+
+        entries: Iterable = []
+        if isinstance(state_term, str):
+            text = state_term.strip()
+            try:
+                literal = ast.literal_eval(text)
+            except (SyntaxError, ValueError):
+                literal = [text]
+            if isinstance(literal, (list, tuple)):
+                entries = literal
+            else:
+                entries = [literal]
+        elif isinstance(state_term, (list, tuple)):
+            entries = state_term
+        else:
+            entries = [state_term]
+
+        for car in entries:
+            parsed.append(_parse_entry(car))
         parsed.sort()
         return tuple(parsed)
+
+    def _parse_car_string(self, text: str) -> Tuple[str, int, int, str, int]:
+
+        match = _CAR_PATTERN.match(text.strip())
+        if not match:
+            raise ValueError(f"Unexpected car term: {text!r}")
+        identifier = match.group(1).strip().upper()
+        x = int(match.group(2))
+        y = int(match.group(3))
+        orientation = match.group(4).strip().upper()
+        length = int(match.group(5))
+        return identifier, x, y, orientation, length
 
     def _python_valid_moves(self, state: StateTuple) -> List[MoveTuple]:
 
