@@ -1,5 +1,3 @@
-"""Test and validate all Rush Hour puzzles."""
-
 from __future__ import annotations
 
 import json
@@ -13,7 +11,7 @@ from puzzle_generator import PuzzleValidator
 
 
 def test_all_puzzles():
-    """Test all puzzle files and report statistics."""
+
     base_dir = Path(__file__).resolve().parent
     puzzle_dir = base_dir / "puzzles"
     asset_dir = base_dir / "assets"
@@ -21,15 +19,13 @@ def test_all_puzzles():
 
     validator = PuzzleValidator()
 
-    # Group puzzles by difficulty
     difficulty_groups = {
         "Beginner": [],
         "Intermediate": [],
         "Advanced": [],
-        "Expert": []
+        "Expert": [],
     }
 
-    # Find all puzzle files
     for puzzle_file in sorted(puzzle_dir.glob("*.json")):
         name = puzzle_file.stem
         if name.startswith("beginner"):
@@ -55,18 +51,16 @@ def test_all_puzzles():
         print("-" * 70)
 
         for puzzle_file in files:
-            # Load puzzle
+
             puzzle = json.loads(puzzle_file.read_text())
             name = puzzle_file.name
 
-            # Validate
             is_valid, error = validator.validate_puzzle(puzzle)
             if not is_valid:
                 print(f"  {name:25s} INVALID: {error}")
                 all_results.append((difficulty, name, False, 0, 0, 0.0))
                 continue
 
-            # Solve
             game = Game(asset_dir=asset_dir, logic_path=logic_file)
             game.load_level(puzzle_file)
             set_move_provider(game.get_valid_moves)
@@ -80,11 +74,11 @@ def test_all_puzzles():
                 all_results.append((difficulty, name, False, 0, 0, 0.0))
                 continue
 
-            # Report
-            print(f"  {name:25s} OK: {cost:3d} moves, {nodes:6d} nodes, {elapsed:6.3f}s")
+            print(
+                f"  {name:25s} OK: {cost:3d} moves, {nodes:6d} nodes, {elapsed:6.3f}s"
+            )
             all_results.append((difficulty, name, True, cost, nodes, elapsed))
 
-    # Summary
     print("\n" + "=" * 70)
     print("SUMMARY")
     print("=" * 70)
@@ -100,9 +94,15 @@ def test_all_puzzles():
 
         print(f"\n{difficulty}:")
         print(f"  Puzzles:       {len(results)}")
-        print(f"  Moves:         min={min(moves):2d}, max={max(moves):2d}, avg={sum(moves)/len(moves):5.1f}")
-        print(f"  Nodes:         min={min(nodes_list):6d}, max={max(nodes_list):6d}, avg={sum(nodes_list)/len(nodes_list):8.1f}")
-        print(f"  Solve time:    min={min(times):.3f}s, max={max(times):.3f}s, avg={sum(times)/len(times):.3f}s")
+        print(
+            f"  Moves:         min={min(moves):2d}, max={max(moves):2d}, avg={sum(moves)/len(moves):5.1f}"
+        )
+        print(
+            f"  Nodes:         min={min(nodes_list):6d}, max={max(nodes_list):6d}, avg={sum(nodes_list)/len(nodes_list):8.1f}"
+        )
+        print(
+            f"  Solve time:    min={min(times):.3f}s, max={max(times):.3f}s, avg={sum(times)/len(times):.3f}s"
+        )
 
     print("\n" + "=" * 70)
 

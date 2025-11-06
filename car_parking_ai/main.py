@@ -1,6 +1,4 @@
-"""Pygame front-end for the AI Car Parking Puzzle Solver."""
-
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import math
 import random
@@ -28,7 +26,6 @@ DIFFICULTY_LEVELS: Dict[str, List[str]] = {
 
 
 class Particle:
-    """Particle effect for visual polish."""
 
     def __init__(self, x: float, y: float, color: Tuple[int, int, int]) -> None:
         self.x = x
@@ -41,15 +38,15 @@ class Particle:
         self.size = random.uniform(2, 5)
 
     def update(self, dt: float) -> bool:
-        """Update particle position and age. Returns False when expired."""
+
         self.x += self.vx
         self.y += self.vy
-        self.vy += 0.2  # gravity
+        self.vy += 0.2
         self.age += dt
         return self.age < self.lifetime
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Render the particle with alpha fade."""
+
         alpha = int(255 * (1 - self.age / self.lifetime))
         size = int(self.size * (1 - self.age / self.lifetime))
         if size > 0:
@@ -59,12 +56,17 @@ class Particle:
 
 
 class Button:
-    """Modern interactive button widget with animations."""
 
     click_sound_callback: Optional[Callable[[str, float], None]] = None
 
-    def __init__(self, label: str, position: Tuple[int, int], callback: Callable[[], None],
-                 width: int = BUTTON_WIDTH, height: int = BUTTON_HEIGHT) -> None:
+    def __init__(
+        self,
+        label: str,
+        position: Tuple[int, int],
+        callback: Callable[[], None],
+        width: int = BUTTON_WIDTH,
+        height: int = BUTTON_HEIGHT,
+    ) -> None:
         self.label = label
         self.rect = pygame.Rect(position[0], position[1], width, height)
         self.callback = callback
@@ -75,68 +77,78 @@ class Button:
         self.height = height
 
     def draw(self, screen: pygame.Surface, font: pygame.font.Font) -> None:
-        """Render the button with smooth hover and click animations."""
-        # Smooth hover transition
+
         target_hover = 1.0 if self.hover else 0.0
         self.hover_scale += (target_hover - self.hover_scale) * 0.15
 
-        # Click animation decay
         if self.click_animation > 0:
             self.click_animation -= 0.05
 
-        # Calculate animated colors
         base_color = 70
         hover_boost = int(30 * self.hover_scale)
         click_offset = int(20 * self.click_animation)
 
-        bg_color = (base_color + hover_boost - click_offset,
-                    base_color + hover_boost - click_offset,
-                    base_color + hover_boost - click_offset)
+        bg_color = (
+            base_color + hover_boost - click_offset,
+            base_color + hover_boost - click_offset,
+            base_color + hover_boost - click_offset,
+        )
 
-        # Gradient background
         self._draw_gradient_rect(screen, self.rect, bg_color, 12)
 
-        # Glow effect on hover
         if self.hover_scale > 0.1:
-            glow_surf = pygame.Surface((self.rect.width + 20, self.rect.height + 20), pygame.SRCALPHA)
+            glow_surf = pygame.Surface(
+                (self.rect.width + 20, self.rect.height + 20), pygame.SRCALPHA
+            )
             glow_alpha = int(40 * self.hover_scale)
-            pygame.draw.rect(glow_surf, (100, 150, 255, glow_alpha),
-                           glow_surf.get_rect(), border_radius=15)
+            pygame.draw.rect(
+                glow_surf,
+                (100, 150, 255, glow_alpha),
+                glow_surf.get_rect(),
+                border_radius=15,
+            )
             screen.blit(glow_surf, (self.rect.x - 10, self.rect.y - 10))
 
-        # Text with subtle shadow
-        text_color = (220 + int(35 * self.hover_scale),
-                     220 + int(35 * self.hover_scale),
-                     220 + int(35 * self.hover_scale))
+        text_color = (
+            220 + int(35 * self.hover_scale),
+            220 + int(35 * self.hover_scale),
+            220 + int(35 * self.hover_scale),
+        )
 
-        # Shadow
         shadow_surface = font.render(self.label, True, (0, 0, 0))
-        shadow_rect = shadow_surface.get_rect(center=(self.rect.centerx + 2, self.rect.centery + 2))
+        shadow_rect = shadow_surface.get_rect(
+            center=(self.rect.centerx + 2, self.rect.centery + 2)
+        )
         screen.blit(shadow_surface, shadow_rect)
 
-        # Main text
         text_surface = font.render(self.label, True, text_color)
         text_rect = text_surface.get_rect(center=self.rect.center)
         screen.blit(text_surface, text_rect)
 
-    def _draw_gradient_rect(self, screen: pygame.Surface, rect: pygame.Rect,
-                           base_color: Tuple[int, int, int], radius: int) -> None:
-        """Draw a rectangle with vertical gradient."""
+    def _draw_gradient_rect(
+        self,
+        screen: pygame.Surface,
+        rect: pygame.Rect,
+        base_color: Tuple[int, int, int],
+        radius: int,
+    ) -> None:
+
         temp_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
         for i in range(rect.height):
             factor = i / rect.height
             color = tuple(int(c * (1 - factor * 0.3)) for c in base_color)
             pygame.draw.line(temp_surf, color, (0, i), (rect.width, i))
 
-        # Create rounded mask
         mask_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        pygame.draw.rect(mask_surf, (255, 255, 255, 255), mask_surf.get_rect(), border_radius=radius)
+        pygame.draw.rect(
+            mask_surf, (255, 255, 255, 255), mask_surf.get_rect(), border_radius=radius
+        )
 
         temp_surf.blit(mask_surf, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
         screen.blit(temp_surf, rect.topleft)
 
     def handle_event(self, event: pygame.event.Event) -> None:
-        """Update hover state and trigger callbacks on click."""
+
         if event.type == pygame.MOUSEMOTION:
             self.hover = self.rect.collidepoint(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -148,13 +160,14 @@ class Button:
 
 
 def main() -> None:
-    """Entrypoint that prepares pygame, loads a level, and runs the loop."""
+
     pygame.init()
-    screen = pygame.display.set_mode((WINDOW_SIZE, TOP_PANEL_HEIGHT + WINDOW_SIZE + BOTTOM_PANEL_HEIGHT))
+    screen = pygame.display.set_mode(
+        (WINDOW_SIZE, TOP_PANEL_HEIGHT + WINDOW_SIZE + BOTTOM_PANEL_HEIGHT)
+    )
     pygame.display.set_caption("Rush Hour AI Solver - Pixel Edition")
     clock = pygame.time.Clock()
 
-    # Pixel-style fonts (using monospace/retro style fonts)
     pixel_fonts = ["Courier New", "Consolas", "monospace"]
     font = pygame.font.SysFont(pixel_fonts, 16)
     info_font = pygame.font.SysFont(pixel_fonts, 15)
@@ -172,7 +185,6 @@ def main() -> None:
 
     game = Game(asset_dir=asset_dir, logic_path=logic_file)
 
-    # Initialize sound system
     pygame.mixer.init()
     sound_enabled = True
     sounds: Dict[str, Optional[pygame.mixer.Sound]] = {
@@ -182,7 +194,6 @@ def main() -> None:
         "win": None,
     }
 
-    # Load sound effects if available
     if sounds_dir.exists():
         sound_files = {
             "click": "click.wav",
@@ -198,18 +209,17 @@ def main() -> None:
                 except pygame.error:
                     pass
 
-    # Load background music if available
     bg_music_path = sounds_dir / "bgm.wav" if sounds_dir.exists() else None
     if bg_music_path and bg_music_path.exists():
         try:
             pygame.mixer.music.load(str(bg_music_path))
             pygame.mixer.music.set_volume(0.3)
-            pygame.mixer.music.play(-1)  # Loop indefinitely
+            pygame.mixer.music.play(-1)
         except pygame.error:
             pass
 
     def play_sound(sound_name: str, volume: float = 0.25) -> None:
-        """Play a sound effect if available and sound is enabled."""
+
         if sound_enabled and sounds.get(sound_name):
             try:
                 sounds[sound_name].set_volume(volume)
@@ -217,10 +227,8 @@ def main() -> None:
             except:
                 pass
 
-    # Set up button click sound
     Button.click_sound_callback = play_sound
 
-    # Visual effects
     particles: List[Particle] = []
     background_pulse = 0.0
     success_animation = 0.0
@@ -241,8 +249,8 @@ def main() -> None:
     status_message = "Ready"
     auto_play = False
     auto_play_timer = 0.0
-    auto_play_delay = 0.4  # seconds between animated steps (faster for modern feel)
-    game_state = "menu"  # menu or playing
+    auto_play_delay = 0.4
+    game_state = "menu"
     selected_level = "Easy"
     selected_car_id: Optional[str] = None
     manual_move_count = 0
@@ -277,9 +285,11 @@ def main() -> None:
             game.last_heuristic = heuristic(state)
             auto_play = True
             status_fade = 1.0
-            # Spawn celebration particles
+
             for _ in range(30):
-                particles.append(Particle(WINDOW_SIZE // 2, WINDOW_SIZE // 2, (100, 200, 255)))
+                particles.append(
+                    Particle(WINDOW_SIZE // 2, WINDOW_SIZE // 2, (100, 200, 255))
+                )
         else:
             status_message = "✗ No solution found."
             status_fade = 1.0
@@ -299,7 +309,7 @@ def main() -> None:
             return
         trigger_success("SUCCESS! Puzzle complete.")
         play_sound("win", 0.7)
-        # Victory particles
+
         for _ in range(50):
             x = random.uniform(WINDOW_SIZE * 0.3, WINDOW_SIZE * 0.7)
             y = random.uniform(WINDOW_SIZE * 0.3, WINDOW_SIZE * 0.7)
@@ -401,36 +411,47 @@ def main() -> None:
 
     buttons: List[Button] = []
 
-    # Create undo/redo buttons at the top (arrow buttons)
     undo_redo_buttons: List[Button] = []
-    undo_button = Button("←", (BUTTON_MARGIN, 5), undo_move,
-                        width=UNDO_REDO_BUTTON_SIZE, height=UNDO_REDO_BUTTON_SIZE)
-    redo_button = Button("→", (BUTTON_MARGIN * 2 + UNDO_REDO_BUTTON_SIZE, 5), redo_move,
-                        width=UNDO_REDO_BUTTON_SIZE, height=UNDO_REDO_BUTTON_SIZE)
+    undo_button = Button(
+        "←",
+        (BUTTON_MARGIN, 5),
+        undo_move,
+        width=UNDO_REDO_BUTTON_SIZE,
+        height=UNDO_REDO_BUTTON_SIZE,
+    )
+    redo_button = Button(
+        "→",
+        (BUTTON_MARGIN * 2 + UNDO_REDO_BUTTON_SIZE, 5),
+        redo_move,
+        width=UNDO_REDO_BUTTON_SIZE,
+        height=UNDO_REDO_BUTTON_SIZE,
+    )
     undo_redo_buttons.append(undo_button)
     undo_redo_buttons.append(redo_button)
 
-    # Bottom buttons - Row 1: Start Solver & Reset, Row 2: Menu (full width)
     row_width = 2 * BUTTON_WIDTH + BUTTON_MARGIN
     row_start_x = (WINDOW_SIZE - row_width) // 2
     y_row1 = TOP_PANEL_HEIGHT + WINDOW_SIZE + BUTTON_MARGIN
     y_row2 = y_row1 + BUTTON_HEIGHT + BUTTON_MARGIN
 
-    # Row 1: Start Solver and Reset
     buttons.append(Button("Start Solver", (row_start_x, y_row1), start_solver))
-    buttons.append(Button("Reset", (row_start_x + BUTTON_WIDTH + BUTTON_MARGIN, y_row1), reset_level))
+    buttons.append(
+        Button(
+            "Reset", (row_start_x + BUTTON_WIDTH + BUTTON_MARGIN, y_row1), reset_level
+        )
+    )
 
-    # Row 2: Menu (full width)
     menu_button_width = row_width
-    buttons.append(Button("Menu", (row_start_x, y_row2), return_to_menu, width=menu_button_width))
+    buttons.append(
+        Button("Menu", (row_start_x, y_row2), return_to_menu, width=menu_button_width)
+    )
 
-    # Create menu buttons for each difficulty level
     menu_buttons = []
-    menu_state = "difficulty_select"  # difficulty_select or puzzle_select
+    menu_state = "difficulty_select"
     selected_difficulty = None
 
     def create_difficulty_menu():
-        """Create buttons for difficulty selection."""
+
         nonlocal menu_buttons, menu_state, selected_difficulty
         menu_buttons = []
 
@@ -450,17 +471,19 @@ def main() -> None:
                     selected_difficulty = diff
                     menu_state = "puzzle_select"
                     create_puzzle_menu(diff)
+
                 return _callback
 
-            menu_buttons.append(Button(difficulty, (x_offset, y_offset), make_callback(difficulty)))
+            menu_buttons.append(
+                Button(difficulty, (x_offset, y_offset), make_callback(difficulty))
+            )
 
     def create_puzzle_menu(difficulty: str):
-        """Create buttons for puzzle selection within a difficulty."""
+
         nonlocal menu_buttons
         menu_buttons = []
         puzzles = DIFFICULTY_LEVELS[difficulty]
 
-        # Use grid layout for 10 puzzles - 4 columns, 3 rows
         max_cols = 4
         button_width = 85
         button_height = 85
@@ -471,18 +494,18 @@ def main() -> None:
             puzzle_num = index + 1
             label = f"{puzzle_num}"
 
-            # Calculate grid position
             row = index // max_cols
             col = index % max_cols
 
-            # Center the grid
             grid_width = max_cols * button_width + (max_cols - 1) * button_spacing
             row_start_x = (WINDOW_SIZE - grid_width) // 2
 
             x_offset = int(row_start_x + col * (button_width + button_spacing))
             y_offset = int(start_y + row * (button_height + button_spacing))
 
-            def make_callback(level_file: str, diff: str, num: int) -> Callable[[], None]:
+            def make_callback(
+                level_file: str, diff: str, num: int
+            ) -> Callable[[], None]:
                 def _callback() -> None:
                     nonlocal game_state, status_message, selected_level, auto_play
                     load_level(level_file)
@@ -490,12 +513,19 @@ def main() -> None:
                     selected_level = f"{diff} #{num}"
                     status_message = f"{diff} Puzzle {num} loaded."
                     auto_play = False
+
                 return _callback
 
-            menu_buttons.append(Button(label, (x_offset, y_offset), make_callback(puzzle_file, difficulty, puzzle_num),
-                                     width=button_width, height=button_height))
+            menu_buttons.append(
+                Button(
+                    label,
+                    (x_offset, y_offset),
+                    make_callback(puzzle_file, difficulty, puzzle_num),
+                    width=button_width,
+                    height=button_height,
+                )
+            )
 
-        # Add back button at bottom
         num_rows = (len(puzzles) + max_cols - 1) // max_cols
         back_btn_y = int(start_y + num_rows * (button_height + button_spacing) + 30)
         back_btn_width = 140
@@ -505,15 +535,22 @@ def main() -> None:
             nonlocal menu_state
             menu_state = "difficulty_select"
             create_difficulty_menu()
-        menu_buttons.append(Button("< Back", (back_btn_x, back_btn_y), go_back,
-                                  width=back_btn_width, height=BUTTON_HEIGHT))
+
+        # menu_buttons.append(
+        #     Button(
+        #         "< Back",
+        #         (back_btn_x, back_btn_y),
+        #         go_back,
+        #         width=back_btn_width,
+        #         height=BUTTON_HEIGHT,
+        #     )
+        # )
 
     create_difficulty_menu()
 
     while True:
         dt = clock.tick(FPS) / 1000.0
 
-        # Update animations
         background_pulse += dt
         if success_hold_timer > 0:
             success_animation = min(1.0, max(success_animation, 0.9))
@@ -522,7 +559,6 @@ def main() -> None:
         if status_fade > 0:
             status_fade = max(0, status_fade - dt * 0.5)
 
-        # Update particles
         particles = [p for p in particles if p.update(dt)]
 
         for event in pygame.event.get():
@@ -542,12 +578,17 @@ def main() -> None:
                             grid_y = (mouse_y - TOP_PANEL_HEIGHT) // cell_size
                             newly_selected: Optional[str] = None
                             for car_id, car in game.cars.items():
-                                if any(cx == grid_x and cy == grid_y for cx, cy in car.occupy_cells()):
+                                if any(
+                                    cx == grid_x and cy == grid_y
+                                    for cx, cy in car.occupy_cells()
+                                ):
                                     newly_selected = car_id
                                     break
                             if newly_selected:
                                 selected_car_id = newly_selected
-                                status_message = f"Car {newly_selected.upper()} selected."
+                                status_message = (
+                                    f"Car {newly_selected.upper()} selected."
+                                )
                                 status_fade = 1.0
                                 auto_play = False
                             else:
@@ -588,15 +629,27 @@ def main() -> None:
                                         game.nodes_expanded = 0
                                         solved = False
                                         if game.current_state:
-                                            game.last_heuristic = heuristic(game.current_state)
+                                            game.last_heuristic = heuristic(
+                                                game.current_state
+                                            )
                                             solved = is_goal(game.current_state)
                                         if solved:
-                                            trigger_success(f"SUCCESS! Cleared in {manual_move_count} moves.")
+                                            trigger_success(
+                                                f"SUCCESS! Cleared in {manual_move_count} moves."
+                                            )
                                             play_sound("win", 0.7)
                                             for _ in range(60):
-                                                x = random.uniform(WINDOW_SIZE * 0.25, WINDOW_SIZE * 0.75)
-                                                y = random.uniform(WINDOW_SIZE * 0.25, WINDOW_SIZE * 0.75)
-                                                particles.append(Particle(x, y, (255, 215, 0)))
+                                                x = random.uniform(
+                                                    WINDOW_SIZE * 0.25,
+                                                    WINDOW_SIZE * 0.75,
+                                                )
+                                                y = random.uniform(
+                                                    WINDOW_SIZE * 0.25,
+                                                    WINDOW_SIZE * 0.75,
+                                                )
+                                                particles.append(
+                                                    Particle(x, y, (255, 215, 0))
+                                                )
                                         else:
                                             status_message = f"Moved {selected_car_id.upper()} {direction}."
                                             status_fade = 1.0
@@ -622,7 +675,7 @@ def main() -> None:
                 else:
                     trigger_success("SUCCESS! Puzzle complete.")
                     play_sound("win", 0.7)
-                    # Final victory particles
+
                     for _ in range(40):
                         x = random.uniform(WINDOW_SIZE * 0.2, WINDOW_SIZE * 0.8)
                         y = random.uniform(WINDOW_SIZE * 0.2, WINDOW_SIZE * 0.8)
@@ -635,7 +688,7 @@ def main() -> None:
                 continue
 
         if game_state == "menu":
-            # Animated gradient background
+
             for y in range(screen.get_height()):
                 factor = y / screen.get_height()
                 pulse = math.sin(background_pulse * 2) * 0.1
@@ -644,23 +697,27 @@ def main() -> None:
                 b = int(40 + 30 * factor + pulse * 20)
                 pygame.draw.line(screen, (r, g, b), (0, y), (screen.get_width(), y))
 
-            # Animated title with glow
             title_text = title_font.render("Rush Hour AI", True, (255, 255, 255))
             title_rect = title_text.get_rect(center=(WINDOW_SIZE // 2, 120))
 
-            # Pulsing glow effect
             glow_size = int(10 + 5 * math.sin(background_pulse * 3))
             for offset in range(glow_size, 0, -2):
                 alpha = int(30 * (1 - offset / glow_size))
-                glow_surf = pygame.Surface((title_rect.width + offset * 2, title_rect.height + offset * 2), pygame.SRCALPHA)
-                glow_text = title_font.render("Rush Hour AI", True, (100, 150, 255, alpha))
-                glow_rect = glow_text.get_rect(center=(glow_surf.get_width() // 2, glow_surf.get_height() // 2))
+                glow_surf = pygame.Surface(
+                    (title_rect.width + offset * 2, title_rect.height + offset * 2),
+                    pygame.SRCALPHA,
+                )
+                glow_text = title_font.render(
+                    "Rush Hour AI", True, (100, 150, 255, alpha)
+                )
+                glow_rect = glow_text.get_rect(
+                    center=(glow_surf.get_width() // 2, glow_surf.get_height() // 2)
+                )
                 glow_surf.blit(glow_text, glow_rect)
                 screen.blit(glow_surf, (title_rect.x - offset, title_rect.y - offset))
 
             screen.blit(title_text, title_rect)
 
-            # Dynamic subtitle based on menu state
             if menu_state == "difficulty_select":
                 subtitle_str = "Select Difficulty Level"
             else:
@@ -669,14 +726,17 @@ def main() -> None:
             subtitle_rect = subtitle_text.get_rect(center=(WINDOW_SIZE // 2, 190))
             screen.blit(subtitle_text, subtitle_rect)
 
-            # Decorative line
             line_y = 230
-            pygame.draw.line(screen, (80, 100, 140), (WINDOW_SIZE // 2 - 100, line_y),
-                           (WINDOW_SIZE // 2 + 100, line_y), 2)
+            pygame.draw.line(
+                screen,
+                (80, 100, 140),
+                (WINDOW_SIZE // 2 - 100, line_y),
+                (WINDOW_SIZE // 2 + 100, line_y),
+                2,
+            )
 
-            # Draw menu buttons with appropriate font
             for button in menu_buttons:
-                # Use larger font for puzzle number buttons (square buttons)
+
                 if button.width == button.height and button.width == 85:
                     button.draw(screen, puzzle_number_font)
                 else:
@@ -684,26 +744,30 @@ def main() -> None:
             pygame.display.flip()
             continue
         else:
-            # Draw top panel background
-            top_panel_surf = pygame.Surface((WINDOW_SIZE, TOP_PANEL_HEIGHT), pygame.SRCALPHA)
+
+            top_panel_surf = pygame.Surface(
+                (WINDOW_SIZE, TOP_PANEL_HEIGHT), pygame.SRCALPHA
+            )
             for y in range(TOP_PANEL_HEIGHT):
                 factor = y / TOP_PANEL_HEIGHT
-                color = (int(25 * (1 - factor * 0.2)), int(25 * (1 - factor * 0.2)), int(30 * (1 - factor * 0.2)), 255)
+                color = (
+                    int(25 * (1 - factor * 0.2)),
+                    int(25 * (1 - factor * 0.2)),
+                    int(30 * (1 - factor * 0.2)),
+                    255,
+                )
                 pygame.draw.line(top_panel_surf, color, (0, y), (WINDOW_SIZE, y))
             screen.blit(top_panel_surf, (0, 0))
 
-            # Draw undo/redo buttons
             for button in undo_redo_buttons:
                 button.draw(screen, arrow_font)
 
-            # Draw level title on top panel (right aligned)
             level_text = font.render(f"Level: {selected_level}", True, (220, 220, 220))
             level_rect = level_text.get_rect()
             level_rect.right = WINDOW_SIZE - 15
             level_rect.centery = TOP_PANEL_HEIGHT // 2
             screen.blit(level_text, level_rect)
 
-            # Update car animations
             game.update_animations()
 
             board_surface = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE))
@@ -714,7 +778,6 @@ def main() -> None:
                 animated = game.animated_cars[selected_car_id]
                 car = animated.car
 
-                # Highlight every legal destination for the selected car.
                 selected_id_upper = selected_car_id.upper()
                 if success_hold_timer <= 0 and not auto_play and game.current_state:
                     seen_positions = set()
@@ -737,11 +800,15 @@ def main() -> None:
                                 if dx == 0 and dy == 0:
                                     break
                                 if orientation == "H":
-                                    dest_x_cell = new_x if dx < 0 else new_x + length - 1
+                                    dest_x_cell = (
+                                        new_x if dx < 0 else new_x + length - 1
+                                    )
                                     dest_y_cell = new_y
                                 else:
                                     dest_x_cell = new_x
-                                    dest_y_cell = new_y if dy < 0 else new_y + length - 1
+                                    dest_y_cell = (
+                                        new_y if dy < 0 else new_y + length - 1
+                                    )
                                 key = (dest_x_cell, dest_y_cell)
                                 if key in seen_positions:
                                     break
@@ -754,77 +821,133 @@ def main() -> None:
                                 )
                                 pad = max(4, cell_size // 4)
                                 dest_rect = dest_rect.inflate(-pad, -pad)
-                                highlight_move = pygame.Surface((dest_rect.width, dest_rect.height), pygame.SRCALPHA)
-                                pygame.draw.rect(highlight_move, (90, 255, 190, 120), highlight_move.get_rect(), border_radius=8)
-                                pygame.draw.rect(highlight_move, (50, 200, 150, 220), highlight_move.get_rect(), width=2, border_radius=8)
+                                highlight_move = pygame.Surface(
+                                    (dest_rect.width, dest_rect.height), pygame.SRCALPHA
+                                )
+                                pygame.draw.rect(
+                                    highlight_move,
+                                    (90, 255, 190, 120),
+                                    highlight_move.get_rect(),
+                                    border_radius=8,
+                                )
+                                pygame.draw.rect(
+                                    highlight_move,
+                                    (50, 200, 150, 220),
+                                    highlight_move.get_rect(),
+                                    width=2,
+                                    border_radius=8,
+                                )
                                 board_surface.blit(highlight_move, dest_rect.topleft)
                                 break
 
-                width = int(cell_size * car.length) if car.orientation == "H" else cell_size
-                height = cell_size if car.orientation == "H" else int(cell_size * car.length)
+                width = (
+                    int(cell_size * car.length) if car.orientation == "H" else cell_size
+                )
+                height = (
+                    cell_size if car.orientation == "H" else int(cell_size * car.length)
+                )
                 highlight_rect = pygame.Rect(
                     int(animated.display_x * cell_size),
                     int(animated.display_y * cell_size),
                     width,
                     height,
                 )
-                highlight = pygame.Surface((highlight_rect.width, highlight_rect.height), pygame.SRCALPHA)
-                pygame.draw.rect(highlight, (120, 200, 255, 70), highlight.get_rect(), border_radius=12)
-                pygame.draw.rect(highlight, (120, 200, 255, 200), highlight.get_rect(), width=3, border_radius=12)
+                highlight = pygame.Surface(
+                    (highlight_rect.width, highlight_rect.height), pygame.SRCALPHA
+                )
+                pygame.draw.rect(
+                    highlight,
+                    (120, 200, 255, 70),
+                    highlight.get_rect(),
+                    border_radius=12,
+                )
+                pygame.draw.rect(
+                    highlight,
+                    (120, 200, 255, 200),
+                    highlight.get_rect(),
+                    width=3,
+                    border_radius=12,
+                )
                 board_surface.blit(highlight, highlight_rect.topleft)
 
-            # Success overlay
             if success_animation > 0:
                 overlay = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE), pygame.SRCALPHA)
-                alpha = int(100 * success_animation * math.sin(success_animation * math.pi))
+                alpha = int(
+                    100 * success_animation * math.sin(success_animation * math.pi)
+                )
                 pygame.draw.rect(overlay, (255, 215, 0, alpha), overlay.get_rect())
                 board_surface.blit(overlay, (0, 0))
                 if success_hold_timer > 0:
                     success_text = title_font.render("SUCCESS", True, (255, 255, 255))
-                    success_rect = success_text.get_rect(center=(WINDOW_SIZE // 2, WINDOW_SIZE // 2 - 20))
+                    success_rect = success_text.get_rect(
+                        center=(WINDOW_SIZE // 2, WINDOW_SIZE // 2 - 20)
+                    )
                     board_surface.blit(success_text, success_rect)
-                    detail_text = subtitle_font.render(status_message, True, (255, 255, 255))
-                    detail_rect = detail_text.get_rect(center=(WINDOW_SIZE // 2, WINDOW_SIZE // 2 + 20))
+                    detail_text = subtitle_font.render(
+                        status_message, True, (255, 255, 255)
+                    )
+                    detail_rect = detail_text.get_rect(
+                        center=(WINDOW_SIZE // 2, WINDOW_SIZE // 2 + 20)
+                    )
                     board_surface.blit(detail_text, detail_rect)
 
             screen.blit(board_surface, (0, TOP_PANEL_HEIGHT))
 
-        # Draw particles
         for particle in particles:
             particle.draw(screen)
 
-        # Modern info panel with gradient
         panel_height = BOTTOM_PANEL_HEIGHT
         panel_surf = pygame.Surface((WINDOW_SIZE, panel_height), pygame.SRCALPHA)
         for y in range(panel_height):
             factor = y / panel_height
-            color = (int(20 * (1 - factor * 0.3)), int(20 * (1 - factor * 0.3)), int(20 * (1 - factor * 0.3)), 255)
+            color = (
+                int(20 * (1 - factor * 0.3)),
+                int(20 * (1 - factor * 0.3)),
+                int(20 * (1 - factor * 0.3)),
+                255,
+            )
             pygame.draw.line(panel_surf, color, (0, y), (WINDOW_SIZE, y))
         screen.blit(panel_surf, (0, TOP_PANEL_HEIGHT + WINDOW_SIZE))
 
-        # Display moves info on same line as buttons
-        moves_y = TOP_PANEL_HEIGHT + WINDOW_SIZE + BUTTON_MARGIN + (BUTTON_HEIGHT // 2) - 8
+        moves_y = (
+            TOP_PANEL_HEIGHT + WINDOW_SIZE + BUTTON_MARGIN + (BUTTON_HEIGHT // 2) - 8
+        )
 
-        # AI Moves
-        ai_moves_text = info_font.render(f"🎯 AI Moves: {game.solution_index}/{len(game.solution_path)}", True, (150, 200, 255))
+        ai_moves_text = info_font.render(
+            f"🎯 AI Moves: {game.solution_index}/{len(game.solution_path)}",
+            True,
+            (150, 200, 255),
+        )
         screen.blit(ai_moves_text, (20, moves_y))
 
-        # Manual Moves
-        manual_moves_text = info_font.render(f"🕹️ Manual: {manual_move_count}", True, (255, 210, 120))
+        manual_moves_text = info_font.render(
+            f"🕹️ Manual: {manual_move_count}", True, (255, 210, 120)
+        )
         screen.blit(manual_moves_text, (20, moves_y + BUTTON_HEIGHT + BUTTON_MARGIN))
 
-        status_y = TOP_PANEL_HEIGHT + WINDOW_SIZE + BUTTON_MARGIN + 2 * (BUTTON_HEIGHT + BUTTON_MARGIN) + 8
+        status_y = (
+            TOP_PANEL_HEIGHT
+            + WINDOW_SIZE
+            + BUTTON_MARGIN
+            + 2 * (BUTTON_HEIGHT + BUTTON_MARGIN)
+            + 8
+        )
         status_x = 20
 
-        # Status message with fade and background
         if status_fade > 0:
             status_width = min(680, WINDOW_SIZE - 40)
             status_bg = pygame.Surface((status_width, 28), pygame.SRCALPHA)
             bg_alpha = int(120 * status_fade)
-            pygame.draw.rect(status_bg, (40, 40, 40, bg_alpha), status_bg.get_rect(), border_radius=8)
+            pygame.draw.rect(
+                status_bg, (40, 40, 40, bg_alpha), status_bg.get_rect(), border_radius=8
+            )
             screen.blit(status_bg, (status_x - 5, status_y))
 
-            status_color = (200 + int(55 * status_fade), 200 + int(55 * status_fade), 200 + int(55 * status_fade))
+            status_color = (
+                200 + int(55 * status_fade),
+                200 + int(55 * status_fade),
+                200 + int(55 * status_fade),
+            )
             status_surf = info_font.render(status_message, True, status_color)
             screen.blit(status_surf, (status_x, status_y + 6))
 
