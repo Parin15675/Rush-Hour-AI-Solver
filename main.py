@@ -11,7 +11,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 import pygame
 
 from game import Game, MoveTuple, StateTuple
-from search import a_star, heuristic, is_goal, set_move_provider
+from search import a_star, configure_board, heuristic, is_goal
 
 WINDOW_SIZE = 720
 FPS = 60
@@ -22,8 +22,19 @@ BOTTOM_PANEL_HEIGHT = 140
 TOP_PANEL_HEIGHT = 55
 UNDO_REDO_BUTTON_SIZE = 45
 DIFFICULTY_LEVELS: Dict[str, List[str]] = {
-    "Expert": [f"expert_{index:02d}.json" for index in range(1, 21)],
+    "Expert": [f"expert_{index:02d}.json" for index in range(13, 21)],
 }
+
+
+def compute_board_geometry(game: Game) -> Tuple[int, int, int, int, int]:
+
+    max_dimension = max(1, max(game.grid_width, game.grid_height))
+    cell_size = max(1, WINDOW_SIZE // max_dimension)
+    board_width = cell_size * game.grid_width
+    board_height = cell_size * game.grid_height
+    offset_x = (WINDOW_SIZE - board_width) // 2
+    offset_y = (WINDOW_SIZE - board_height) // 2
+    return cell_size, offset_x, offset_y, board_width, board_height
 
 
 class Particle:
@@ -168,6 +179,7 @@ def main() -> None:
     )
     pygame.display.set_caption("Rush Hour AI Solver - Pixel Edition")
     clock = pygame.time.Clock()
+    board_surface = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE))
 
     pixel_fonts = ["Courier New", "Consolas", "monospace"]
     font = pygame.font.SysFont(pixel_fonts, 16)
@@ -239,7 +251,15 @@ def main() -> None:
         nonlocal selected_car_id, manual_move_count, success_hold_timer, undo_stack, redo_stack
         level_path = puzzle_dir / level_name
         game.load_level(level_path)
-        set_move_provider(game.get_valid_moves)
+        configure_board(
+            game.grid_width,
+            game.grid_height,
+            game.exit_row,
+            game.exit_col,
+            game.poles,
+            game.exit_rows,
+            game.exit_any_row,
+        )
         game.last_heuristic = 0.0
         selected_car_id = None
         manual_move_count = 0
@@ -250,7 +270,7 @@ def main() -> None:
     status_message = "Ready"
     auto_play = False
     auto_play_timer = 0.0
-    auto_play_delay = 0.4
+    auto_play_delay = 0.25
     game_state = "menu"
     selected_level = "Easy"
     selected_car_id: Optional[str] = None
@@ -288,6 +308,10 @@ def main() -> None:
             status_message = "No level loaded."
             status_fade = 1.0
             return
+        if not any(car[0].upper() == "R" for car in state):
+            status_message = "Add the red car (id 'R') before running the solver."
+            status_fade = 1.0
+            return
 
         solver_error = None
         solver_result = None
@@ -303,7 +327,7 @@ def main() -> None:
             nonlocal solver_result, solver_running, solver_error
             try:
                 start_time = time.perf_counter()
-                path, cost, expanded = a_star(state_snapshot, game.get_valid_moves)
+                path, cost, expanded = a_star(state_snapshot)
                 elapsed_time = time.perf_counter() - start_time
                 solver_result = (
                     path,
@@ -594,6 +618,13 @@ def main() -> None:
             solver_spin_angle = 0.0
 
         particles = [p for p in particles if p.update(dt)]
+        (
+            cell_size,
+            board_offset_x,
+            board_offset_y,
+            board_width_px,
+            board_height_px,
+        ) = compute_board_geometry(game)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -612,9 +643,22 @@ def main() -> None:
                     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         mouse_x, mouse_y = event.pos
                         if TOP_PANEL_HEIGHT < mouse_y < TOP_PANEL_HEIGHT + WINDOW_SIZE:
-                            cell_size = WINDOW_SIZE // game.grid_size
-                            grid_x = mouse_x // cell_size
-                            grid_y = (mouse_y - TOP_PANEL_HEIGHT) // cell_size
+                            local_x = mouse_x
+                            local_y = mouse_y - TOP_PANEL_HEIGHT
+                            within_board = (
+                                board_offset_x
+                                <= local_x
+                                < board_offset_x + board_width_px
+                            ) and (
+                                board_offset_y
+                                <= local_y
+                                < board_offset_y + board_height_px
+                            )
+                            if not within_board:
+                                selected_car_id = None
+                                continue
+                            grid_x = int((local_x - board_offset_x) // cell_size)
+                            grid_y = int((local_y - board_offset_y) // cell_size)
                             newly_selected: Optional[str] = None
                             for car_id, car in game.cars.items():
                                 if any(
@@ -645,7 +689,11 @@ def main() -> None:
                             car = game.cars.get(selected_car_id)
                             if car:
                                 direction: Optional[str] = None
-                                if car.orientation == "H":
+                                if event.key == pygame.K_q:
+                                    direction = "rotate_ccw"
+                                elif event.key == pygame.K_e:
+                                    direction = "rotate_cw"
+                                elif car.orientation == "H":
                                     if event.key == pygame.K_LEFT:
                                         direction = "left"
                                     elif event.key == pygame.K_RIGHT:
@@ -690,7 +738,15 @@ def main() -> None:
                                                     Particle(x, y, (255, 215, 0))
                                                 )
                                         else:
-                                            status_message = f"Moved {selected_car_id.upper()} {direction}."
+                                            if direction and direction.startswith("rotate"):
+                                                pretty = "CW" if direction.endswith("cw") else "CCW"
+                                                status_message = (
+                                                    f"Rotated {selected_car_id.upper()} {pretty}."
+                                                )
+                                            else:
+                                                status_message = (
+                                                    f"Moved {selected_car_id.upper()} {direction}."
+                                                )
                                             status_fade = 1.0
                                             play_sound("move", 0.4)
                                     else:
@@ -751,24 +807,31 @@ def main() -> None:
                     status_message = "✗ No solution found."
                     status_fade = 1.0
 
-        if auto_play and game_state == "playing":
-            auto_play_timer += dt
-            if auto_play_timer >= auto_play_delay:
-                auto_play_timer = 0.0
-                prev_state = game.current_state
-                prev_manual = manual_move_count
-                moved = game.step_solution()
-                if moved:
-                    _push_undo_snapshot(prev_state, prev_manual)
-                    play_sound("move", 0.3)
-                else:
-                    trigger_success("SUCCESS! Puzzle complete.")
-                    play_sound("win", 0.7)
+        animations_active = False
+        if game_state == "playing":
+            animations_active = game.update_animations()
 
-                    for _ in range(40):
-                        x = random.uniform(WINDOW_SIZE * 0.2, WINDOW_SIZE * 0.8)
-                        y = random.uniform(WINDOW_SIZE * 0.2, WINDOW_SIZE * 0.8)
-                        particles.append(Particle(x, y, (255, 215, 0)))
+        if auto_play and game_state == "playing":
+            if animations_active:
+                auto_play_timer = 0.0
+            else:
+                auto_play_timer += dt
+                if auto_play_timer >= auto_play_delay:
+                    auto_play_timer = 0.0
+                    prev_state = game.current_state
+                    prev_manual = manual_move_count
+                    moved = game.step_solution()
+                    if moved:
+                        _push_undo_snapshot(prev_state, prev_manual)
+                        play_sound("move", 0.3)
+                    else:
+                        trigger_success("SUCCESS! Puzzle complete.")
+                        play_sound("win", 0.7)
+
+                        for _ in range(40):
+                            x = random.uniform(WINDOW_SIZE * 0.2, WINDOW_SIZE * 0.8)
+                            y = random.uniform(WINDOW_SIZE * 0.2, WINDOW_SIZE * 0.8)
+                            particles.append(Particle(x, y, (255, 215, 0)))
 
         if success_hold_timer > 0:
             success_hold_timer = max(0.0, success_hold_timer - dt)
@@ -857,13 +920,10 @@ def main() -> None:
             level_rect.centery = TOP_PANEL_HEIGHT // 2
             screen.blit(level_text, level_rect)
 
-            game.update_animations()
-
-            board_surface = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE))
+            board_surface.fill((0, 0, 0))
             game.draw(board_surface)
 
             if selected_car_id and selected_car_id in game.animated_cars:
-                cell_size = WINDOW_SIZE // game.grid_size
                 animated = game.animated_cars[selected_car_id]
                 car = animated.car
 
@@ -882,13 +942,14 @@ def main() -> None:
                         for state_car in next_state:
                             if state_car[0].upper() == selected_id_upper:
                                 new_x, new_y = state_car[1], state_car[2]
-                                orientation = state_car[3].upper()
+                                heading = state_car[3].upper()
+                                axis = "H" if heading in ("H", "E", "W") else "V"
                                 length = state_car[4]
                                 dx = new_x - current_x
                                 dy = new_y - current_y
                                 if dx == 0 and dy == 0:
                                     break
-                                if orientation == "H":
+                                if axis == "H":
                                     dest_x_cell = (
                                         new_x if dx < 0 else new_x + length - 1
                                     )
@@ -903,8 +964,8 @@ def main() -> None:
                                     break
                                 seen_positions.add(key)
                                 dest_rect = pygame.Rect(
-                                    dest_x_cell * cell_size,
-                                    dest_y_cell * cell_size,
+                                    board_offset_x + dest_x_cell * cell_size,
+                                    board_offset_y + dest_y_cell * cell_size,
                                     cell_size,
                                     cell_size,
                                 )
@@ -936,8 +997,8 @@ def main() -> None:
                     cell_size if car.orientation == "H" else int(cell_size * car.length)
                 )
                 highlight_rect = pygame.Rect(
-                    int(animated.display_x * cell_size),
-                    int(animated.display_y * cell_size),
+                    board_offset_x + int(animated.display_x * cell_size),
+                    board_offset_y + int(animated.display_y * cell_size),
                     width,
                     height,
                 )
