@@ -1,5 +1,5 @@
-# Rush Hour AI Solver – Pixel Edition
-
+# Rush Hour AI Solver 
+![Game Screenshot](assets/p1.png)
 An interactive Rush Hour–style puzzle game with an AI solver, built with Python, Pygame, and Prolog.  
 The project was created as part of an AI course to explore informed search (A*) on a combinatorial puzzle.
 
